@@ -549,6 +549,48 @@ body::before{
 .rb-sub{font-size:12px;color:var(--text2);margin-top:2px}
 .rb-arrow{color:var(--accent);font-size:18px}
 
+/* REVIEW SCREEN */
+.review-ex{
+  margin:0 16px 12px;
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:14px;
+  overflow:hidden;
+}
+.review-ex-header{
+  padding:12px 14px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.review-ex-name{
+  font-family:'Space Mono',monospace;
+  font-size:14px;font-weight:700;
+}
+.review-ex-muscle{font-size:11px;color:var(--text2);margin-top:2px}
+.review-set-row{
+  display:grid;
+  grid-template-columns:32px 1fr 1fr;
+  gap:8px;align-items:center;
+  padding:8px 14px;
+  border-bottom:1px solid var(--border);
+}
+.review-set-row:last-child{border-bottom:none}
+.review-set-num{
+  font-family:'Space Mono',monospace;
+  font-size:12px;color:var(--text2);
+  text-align:center;
+}
+.review-set-val{
+  font-family:'Space Mono',monospace;
+  font-size:13px;color:var(--text);
+  text-align:center;
+}
+.review-set-label{
+  font-family:'Space Mono',monospace;
+  font-size:9px;color:var(--text3);
+  text-align:center;
+}
+
 /* MODAL / BOTTOM SHEET */
 .modal-overlay{
   position:fixed;inset:0;z-index:200;
@@ -797,6 +839,24 @@ body::before{
 
 </div>
 
+  <!-- REVIEW SCREEN (past workout detail) -->
+  <div id="screen-review" class="screen">
+    <div class="top-bar">
+      <div style="cursor:pointer;color:var(--accent);font-size:14px;font-family:'Space Mono',monospace" onclick="goHome()">← Back</div>
+      <div class="logo">pip<span>gym</span></div>
+      <div></div>
+    </div>
+    <div class="workout-header">
+      <div class="workout-title" id="review-title"></div>
+      <div class="workout-subtitle" id="review-subtitle"></div>
+    </div>
+    <div class="stats-grid" style="margin-top:12px">
+      <div class="stat-box"><div class="stat-val" id="rev-duration">-</div><div class="stat-label">Duration</div></div>
+      <div class="stat-box"><div class="stat-val" id="rev-sets">-</div><div class="stat-label">Sets</div></div>
+    </div>
+    <div id="review-exercises" style="padding-bottom:40px"></div>
+  </div>
+
 <!-- Rest Timer Overlay -->
 <div class="rest-overlay hidden" id="rest-overlay">
   <div class="rest-label">Rest</div>
@@ -926,13 +986,14 @@ async function loadRecentWorkouts() {
       const wasCompleted = w.status === 'completed' && w.duration_seconds > 0;
       const dotClass = wasCompleted ? '' : ' incomplete';
       return `
-        <div class="workout-item">
+        <div class="workout-item" onclick="viewPastWorkout('${w.id}')" style="cursor:pointer">
           <div class="wi-dot${dotClass}"></div>
           <div class="wi-info">
             <div class="wi-title">${escHtml(w.title || 'Workout')}</div>
             <div class="wi-meta">${dateStr}${exCount ? ` · ${exCount} exercises` : ''}${!wasCompleted ? ' · not completed' : ''}</div>
           </div>
           ${dur ? `<div class="wi-badge">${dur}</div>` : ''}
+          <div style="color:var(--text3);font-size:16px;flex-shrink:0">›</div>
         </div>
       `;
     }).join('');
@@ -1603,6 +1664,124 @@ function goHome() {
   showScreen('home');
   loadStreak();
   loadRecentWorkouts();
+}
+
+// ── REVIEW PAST WORKOUT ────────────────────────────────────────────────────────
+async function viewPastWorkout(workoutId) {
+  showScreen('review');
+  document.getElementById('review-title').textContent = 'Loading...';
+  document.getElementById('review-subtitle').textContent = '';
+  document.getElementById('review-exercises').innerHTML = '';
+  document.getElementById('rev-duration').textContent = '-';
+  document.getElementById('rev-sets').textContent = '-';
+
+  try {
+    // Fetch workout
+    const { data: workout } = await sb.from('pip_workouts')
+      .select('*')
+      .eq('id', workoutId)
+      .single();
+
+    if (!workout) { goHome(); return; }
+
+    // Fetch logged sets
+    const { data: sets } = await sb.from('pip_sets')
+      .select('*')
+      .eq('workout_id', workoutId)
+      .order('set_number', { ascending: true });
+
+    const date = new Date(workout.completed_at || workout.created_at);
+    const dateStr = date.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+
+    document.getElementById('review-title').textContent = workout.title || 'Workout';
+    document.getElementById('review-subtitle').textContent = dateStr;
+    document.getElementById('rev-duration').textContent = workout.duration_seconds ? formatDuration(workout.duration_seconds) : '-';
+
+    // Group sets by exercise
+    const setsByEx = {};
+    (sets || []).forEach(s => {
+      if (!setsByEx[s.exercise_name]) setsByEx[s.exercise_name] = [];
+      setsByEx[s.exercise_name].push(s);
+    });
+
+    document.getElementById('rev-sets').textContent = (sets || []).length;
+
+    const exercises = workout.exercises || [];
+    const exEl = document.getElementById('review-exercises');
+
+    // Group by section
+    let currentSection = null;
+    let html = '';
+
+    exercises.forEach(ex => {
+      const section = (ex.section || '').trim();
+      if (section && section !== currentSection) {
+        html += `<div class="section-divider" style="pointer-events:none">
+          <div class="section-divider-line"></div>
+          <div class="section-divider-icon">${getSectionIcon(section)}</div>
+          <div class="section-divider-label">${escHtml(section)}</div>
+          <div class="section-divider-line"></div>
+        </div>`;
+        currentSection = section;
+      }
+
+      const exSets = setsByEx[ex.name] || [];
+      const isTime = !!ex.hasTime;
+      const isHeight = !!ex.hasHeight;
+
+      let setsHtml = '';
+      if (exSets.length > 0) {
+        // Header row
+        let col1 = 'WEIGHT', col2 = 'REPS';
+        if (isTime) { col1 = 'TIME'; col2 = ''; }
+        else if (isHeight) { col1 = 'HEIGHT'; col2 = 'REPS'; }
+
+        setsHtml += `<div class="review-set-row">
+          <div class="review-set-label">SET</div>
+          <div class="review-set-label">${col1}</div>
+          ${col2 ? `<div class="review-set-label">${col2}</div>` : '<div></div>'}
+        </div>`;
+
+        exSets.forEach(s => {
+          let val1 = '', val2 = '';
+          if (isTime) {
+            const totalSec = s.reps || 0;
+            if (totalSec >= 60) val1 = `${Math.floor(totalSec/60)}m ${totalSec%60}s`;
+            else val1 = `${totalSec}s`;
+          } else if (isHeight) {
+            val1 = s.weight ? `${s.weight}"` : '-';
+            val2 = s.reps || '-';
+          } else {
+            val1 = s.weight ? `${s.weight} lbs` : '-';
+            val2 = s.reps || '-';
+          }
+          setsHtml += `<div class="review-set-row">
+            <div class="review-set-num">${s.set_number}</div>
+            <div class="review-set-val">${val1}</div>
+            ${col2 ? `<div class="review-set-val">${val2}</div>` : '<div></div>'}
+          </div>`;
+        });
+      } else {
+        setsHtml = `<div style="padding:10px 14px;color:var(--text3);font-size:12px;">No sets logged</div>`;
+      }
+
+      html += `<div class="review-ex">
+        <div class="review-ex-header">
+          <div>
+            <div class="review-ex-name">${escHtml(ex.name)}</div>
+            <div class="review-ex-muscle">${escHtml(ex.muscle || '')}</div>
+          </div>
+          <div class="ex-badge">${ex.hasTime ? `${ex.sets || '-'} × hold` : `${ex.sets || '-'} × ${ex.reps || '?'}`}</div>
+        </div>
+        ${setsHtml}
+      </div>`;
+    });
+
+    exEl.innerHTML = html;
+  } catch(e) {
+    console.error('Review error:', e);
+    document.getElementById('review-title').textContent = 'Error loading workout';
+  }
 }
 
 // ── QUICK ACTIONS ─────────────────────────────────────────────────────────────
