@@ -1709,11 +1709,28 @@ async function viewPastWorkout(workoutId) {
     const exercises = workout.exercises || [];
     const exEl = document.getElementById('review-exercises');
 
-    // Group by section
+    // Build a lookup for exercise metadata (hasTime, hasHeight) by name
+    const exMeta = {};
+    exercises.forEach(ex => { exMeta[ex.name] = ex; });
+
+    // Build display list: use exercises JSON if available, otherwise derive from sets
+    let displayList = exercises.length > 0 ? exercises : [];
+    
+    // If no exercises JSON, build from sets
+    if (displayList.length === 0 && sets && sets.length > 0) {
+      const seen = new Set();
+      sets.forEach(s => {
+        if (!seen.has(s.exercise_name)) {
+          seen.add(s.exercise_name);
+          displayList.push({ name: s.exercise_name, muscle: s.exercise_muscle || '' });
+        }
+      });
+    }
+
     let currentSection = null;
     let html = '';
 
-    exercises.forEach(ex => {
+    displayList.forEach(ex => {
       const section = (ex.section || '').trim();
       if (section && section !== currentSection) {
         html += `<div class="section-divider" style="pointer-events:none">
@@ -1726,8 +1743,9 @@ async function viewPastWorkout(workoutId) {
       }
 
       const exSets = setsByEx[ex.name] || [];
-      const isTime = !!ex.hasTime;
-      const isHeight = !!ex.hasHeight;
+      const meta = exMeta[ex.name] || ex;
+      const isTime = !!meta.hasTime;
+      const isHeight = !!meta.hasHeight;
 
       let setsHtml = '';
       if (exSets.length > 0) {
@@ -1765,13 +1783,14 @@ async function viewPastWorkout(workoutId) {
         setsHtml = `<div style="padding:10px 14px;color:var(--text3);font-size:12px;">No sets logged</div>`;
       }
 
+      const badgeText = isTime ? `${meta.sets || exSets.length} × hold` : `${meta.sets || exSets.length} × ${meta.reps || '?'}`;
       html += `<div class="review-ex">
         <div class="review-ex-header">
           <div>
             <div class="review-ex-name">${escHtml(ex.name)}</div>
             <div class="review-ex-muscle">${escHtml(ex.muscle || '')}</div>
           </div>
-          <div class="ex-badge">${ex.hasTime ? `${ex.sets || '-'} × hold` : `${ex.sets || '-'} × ${ex.reps || '?'}`}</div>
+          <div class="ex-badge">${badgeText}</div>
         </div>
         ${setsHtml}
       </div>`;
