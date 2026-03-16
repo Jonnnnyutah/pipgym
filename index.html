@@ -1080,17 +1080,27 @@ function renderExerciseCard(ex, idx) {
     const log = setLogs[idx]?.[s] || {};
     const logged = !!log.logged;
     if (isTime) {
+      const totalSec = log.reps || 0;
+      const dispMin = Math.floor(totalSec / 60) || '';
+      const dispSec = totalSec ? (totalSec % 60) : '';
       rows.push(`
         <div class="set-row ${logged ? 'logged' : ''}" id="set-row-${idx}-${s}">
           <div class="set-num">${s}</div>
           <input class="set-input ${logged ? 'disabled' : ''}"
-            type="number" inputmode="numeric" placeholder="sec"
-            id="reps-${idx}-${s}"
-            value="${log.reps || ''}"
+            type="number" inputmode="numeric" placeholder="min"
+            id="time-min-${idx}-${s}"
+            value="${dispMin}"
             ${logged ? 'disabled' : ''}
-            style="width:100px;"
-            onchange="setLogChange(${idx},${s},'reps',this.value)">
-          <div style="font-size:11px;color:var(--text3);font-family:'Space Mono'">sec</div>
+            style="width:55px;"
+            onchange="setTimeChange(${idx},${s})">
+          <div style="font-size:11px;color:var(--text3)">:</div>
+          <input class="set-input ${logged ? 'disabled' : ''}"
+            type="number" inputmode="numeric" placeholder="sec"
+            id="time-sec-${idx}-${s}"
+            value="${dispSec}"
+            ${logged ? 'disabled' : ''}
+            style="width:55px;"
+            onchange="setTimeChange(${idx},${s})">
           <div class="set-check ${logged ? 'done' : ''}"
             id="check-${idx}-${s}"
             onclick="logSet(${idx},${s})">
@@ -1132,8 +1142,9 @@ function renderExerciseCard(ex, idx) {
   const headerLabels = isTime
     ? `<div class="set-row" style="margin-bottom:4px">
         <div class="set-num" style="font-size:9px;color:var(--text3)">SET</div>
-        <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">TIME</div>
+        <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">MIN</div>
         <div></div>
+        <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">SEC</div>
         <div></div>
       </div>`
     : `<div class="set-row" style="margin-bottom:4px">
@@ -1173,6 +1184,15 @@ function setLogChange(exIdx, setNum, field, value) {
   if (!setLogs[exIdx]) setLogs[exIdx] = {};
   if (!setLogs[exIdx][setNum]) setLogs[exIdx][setNum] = {};
   setLogs[exIdx][setNum][field] = value;
+}
+
+function setTimeChange(exIdx, setNum) {
+  const minEl = document.getElementById(`time-min-${exIdx}-${setNum}`);
+  const secEl = document.getElementById(`time-sec-${exIdx}-${setNum}`);
+  const min = parseInt(minEl?.value) || 0;
+  const sec = parseInt(secEl?.value) || 0;
+  const totalSeconds = (min * 60) + sec;
+  setLogChange(exIdx, setNum, 'reps', totalSeconds);
 }
 
 async function logSet(exIdx, setNum) {
