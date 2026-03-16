@@ -1075,11 +1075,37 @@ function renderExercises(workout) {
 function renderExerciseCard(ex, idx) {
   const sets = ex.sets || 3;
   const isTime = !!ex.hasTime;
+  const isHeight = !!ex.hasHeight;
   const rows = [];
   for (let s = 1; s <= sets; s++) {
     const log = setLogs[idx]?.[s] || {};
     const logged = !!log.logged;
-    if (isTime) {
+    if (isHeight) {
+      rows.push(`
+        <div class="set-row ${logged ? 'logged' : ''}" id="set-row-${idx}-${s}">
+          <div class="set-num">${s}</div>
+          <input class="set-input ${logged ? 'disabled' : ''}"
+            type="number" inputmode="decimal" placeholder="inches"
+            id="height-${idx}-${s}"
+            value="${log.height || ''}"
+            ${logged ? 'disabled' : ''}
+            onchange="setLogChange(${idx},${s},'height',this.value)">
+          <input class="set-input ${logged ? 'disabled' : ''}"
+            type="number" inputmode="numeric" placeholder="${ex.reps || 'reps'}"
+            id="reps-${idx}-${s}"
+            value="${log.reps || ''}"
+            ${logged ? 'disabled' : ''}
+            onchange="setLogChange(${idx},${s},'reps',this.value)">
+          <div class="set-check ${logged ? 'done' : ''}"
+            id="check-${idx}-${s}"
+            onclick="logSet(${idx},${s})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="${logged ? 'white' : 'currentColor'}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+        </div>
+      `);
+    } else if (isTime) {
       const totalSec = log.reps || 0;
       const dispMin = Math.floor(totalSec / 60) || '';
       const dispSec = totalSec ? (totalSec % 60) : '';
@@ -1138,8 +1164,15 @@ function renderExerciseCard(ex, idx) {
     }
   }
   const imgUrl = ex.imageUrl || ex.formImageUrl || null;
-  const badgeText = isTime ? `${sets} × hold` : `${sets} × ${ex.reps || '?'}`;
-  const headerLabels = isTime
+  const badgeText = isTime ? `${sets} × hold` : isHeight ? `${sets} × ${ex.reps || '?'}` : `${sets} × ${ex.reps || '?'}`;
+  const headerLabels = isHeight
+    ? `<div class="set-row" style="margin-bottom:4px">
+        <div class="set-num" style="font-size:9px;color:var(--text3)">SET</div>
+        <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">HEIGHT</div>
+        <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">REPS</div>
+        <div></div>
+      </div>`
+    : isTime
     ? `<div class="set-row" style="margin-bottom:4px">
         <div class="set-num" style="font-size:9px;color:var(--text3)">SET</div>
         <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">MIN</div>
@@ -1201,36 +1234,59 @@ async function logSet(exIdx, setNum) {
   if (log.logged) return; // already done
 
   const ex = currentWorkout.exercises[exIdx];
-  const weightEl = document.getElementById(`weight-${exIdx}-${setNum}`);
-  const repsEl = document.getElementById(`reps-${exIdx}-${setNum}`);
+  const isHeight = !!ex.hasHeight;
+  const isTime = !!ex.hasTime;
   
-  const weight = parseFloat(weightEl?.value) || null;
-  const reps = parseInt(repsEl?.value) || null;
+  let weight = null, reps = null, height = null;
+  
+  if (isHeight) {
+    const heightEl = document.getElementById(`height-${exIdx}-${setNum}`);
+    const repsEl = document.getElementById(`reps-${exIdx}-${setNum}`);
+    height = parseFloat(heightEl?.value) || null;
+    reps = parseInt(repsEl?.value) || null;
+    if (heightEl) heightEl.disabled = true;
+    if (repsEl) repsEl.disabled = true;
+  } else if (isTime) {
+    // time is stored as total seconds in reps via setTimeChange
+    reps = log.reps || null;
+    const minEl = document.getElementById(`time-min-${exIdx}-${setNum}`);
+    const secEl = document.getElementById(`time-sec-${exIdx}-${setNum}`);
+    if (minEl) minEl.disabled = true;
+    if (secEl) secEl.disabled = true;
+  } else {
+    const weightEl = document.getElementById(`weight-${exIdx}-${setNum}`);
+    const repsEl = document.getElementById(`reps-${exIdx}-${setNum}`);
+    weight = parseFloat(weightEl?.value) || null;
+    reps = parseInt(repsEl?.value) || null;
+    if (weightEl) weightEl.disabled = true;
+    if (repsEl) repsEl.disabled = true;
+  }
 
   // Optimistic UI
   if (!setLogs[exIdx]) setLogs[exIdx] = {};
-  setLogs[exIdx][setNum] = { weight, reps, logged: true };
+  setLogs[exIdx][setNum] = { weight, reps, height, logged: true };
 
   const row = document.getElementById(`set-row-${exIdx}-${setNum}`);
   const check = document.getElementById(`check-${exIdx}-${setNum}`);
   row.classList.add('logged');
   check.classList.add('done');
   check.querySelector('svg').setAttribute('stroke', 'white');
-  if (weightEl) weightEl.disabled = true;
-  if (repsEl) repsEl.disabled = true;
 
   // Insert to DB
+  // For height exercises, store height in weight column (DB doesn't have height_inches yet)
+  const dbRow = {
+    workout_id: currentWorkout.id,
+    exercise_name: ex.name,
+    exercise_muscle: ex.muscle,
+    set_number: setNum,
+    weight: isHeight ? height : weight,
+    reps,
+    logged: true,
+    logged_at: new Date().toISOString()
+  };
+  
   try {
-    await sb.from('pip_sets').insert({
-      workout_id: currentWorkout.id,
-      exercise_name: ex.name,
-      exercise_muscle: ex.muscle,
-      set_number: setNum,
-      weight,
-      reps,
-      logged: true,
-      logged_at: new Date().toISOString()
-    });
+    await sb.from('pip_sets').insert(dbRow);
   } catch(e) { console.error('Set log error:', e); }
 
   checkFinishReady();
