@@ -206,6 +206,10 @@ body::before{
   background:var(--green);flex-shrink:0;
   box-shadow:0 0 6px rgba(34,197,94,0.4);
 }
+.wi-dot.incomplete{
+  background:var(--red);
+  box-shadow:0 0 6px rgba(239,68,68,0.4);
+}
 .wi-info{flex:1;min-width:0}
 .wi-title{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wi-meta{font-size:11px;color:var(--text2);margin-top:2px}
@@ -792,9 +796,9 @@ async function loadRecentWorkouts() {
   try {
     const { data } = await sb.from('pip_workouts')
       .select('*')
-      .eq('status', 'completed')
-      .order('completed_at', { ascending: false })
-      .limit(5);
+      .in('status', ['completed', 'abandoned'])
+      .order('created_at', { ascending: false })
+      .limit(10);
 
     if (!data || data.length === 0) {
       el.innerHTML = '<div class="empty-state">No workouts yet.<br>Hit Start to begin! 🔥</div>';
@@ -806,12 +810,14 @@ async function loadRecentWorkouts() {
       const dateStr = date.toLocaleDateString('en-US', { month:'short', day:'numeric' });
       const dur = w.duration_seconds ? formatDuration(w.duration_seconds) : '';
       const exCount = Array.isArray(w.exercises) ? w.exercises.length : 0;
+      const wasCompleted = w.status === 'completed' && w.duration_seconds > 0;
+      const dotClass = wasCompleted ? '' : ' incomplete';
       return `
         <div class="workout-item">
-          <div class="wi-dot"></div>
+          <div class="wi-dot${dotClass}"></div>
           <div class="wi-info">
             <div class="wi-title">${escHtml(w.title || 'Workout')}</div>
-            <div class="wi-meta">${dateStr}${exCount ? ` · ${exCount} exercises` : ''}</div>
+            <div class="wi-meta">${dateStr}${exCount ? ` · ${exCount} exercises` : ''}${!wasCompleted ? ' · not completed' : ''}</div>
           </div>
           ${dur ? `<div class="wi-badge">${dur}</div>` : ''}
         </div>
