@@ -1074,10 +1074,33 @@ function renderExercises(workout) {
 
 function renderExerciseCard(ex, idx) {
   const sets = ex.sets || 3;
-    const rows = [];
-    for (let s = 1; s <= sets; s++) {
-      const log = setLogs[idx]?.[s] || {};
-      const logged = !!log.logged;
+  const isTime = !!ex.hasTime;
+  const rows = [];
+  for (let s = 1; s <= sets; s++) {
+    const log = setLogs[idx]?.[s] || {};
+    const logged = !!log.logged;
+    if (isTime) {
+      rows.push(`
+        <div class="set-row ${logged ? 'logged' : ''}" id="set-row-${idx}-${s}">
+          <div class="set-num">${s}</div>
+          <input class="set-input ${logged ? 'disabled' : ''}"
+            type="number" inputmode="numeric" placeholder="sec"
+            id="reps-${idx}-${s}"
+            value="${log.reps || ''}"
+            ${logged ? 'disabled' : ''}
+            style="width:100px;"
+            onchange="setLogChange(${idx},${s},'reps',this.value)">
+          <div style="font-size:11px;color:var(--text3);font-family:'Space Mono'">sec</div>
+          <div class="set-check ${logged ? 'done' : ''}"
+            id="check-${idx}-${s}"
+            onclick="logSet(${idx},${s})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="${logged ? 'white' : 'currentColor'}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+        </div>
+      `);
+    } else {
       rows.push(`
         <div class="set-row ${logged ? 'logged' : ''}" id="set-row-${idx}-${s}">
           <div class="set-num">${s}</div>
@@ -1103,15 +1126,30 @@ function renderExerciseCard(ex, idx) {
         </div>
       `);
     }
-    const imgUrl = ex.imageUrl || ex.formImageUrl || null;
-    return `
+  }
+  const imgUrl = ex.imageUrl || ex.formImageUrl || null;
+  const badgeText = isTime ? `${sets} × hold` : `${sets} × ${ex.reps || '?'}`;
+  const headerLabels = isTime
+    ? `<div class="set-row" style="margin-bottom:4px">
+        <div class="set-num" style="font-size:9px;color:var(--text3)">SET</div>
+        <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">TIME</div>
+        <div></div>
+        <div></div>
+      </div>`
+    : `<div class="set-row" style="margin-bottom:4px">
+        <div class="set-num" style="font-size:9px;color:var(--text3)">SET</div>
+        <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">WEIGHT</div>
+        <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">REPS</div>
+        <div></div>
+      </div>`;
+  return `
       <div class="ex-card">
         <div class="ex-header">
           <div>
             <div class="ex-name">${escHtml(ex.name)}</div>
             <div class="ex-muscle">${escHtml(ex.muscle || '')}</div>
           </div>
-          <div class="ex-badge">${sets} × ${ex.reps || '?'}</div>
+          <div class="ex-badge">${badgeText}</div>
         </div>
         ${ex.notes ? `<div class="ex-notes">${escHtml(ex.notes)}</div>` : ''}
         ${imgUrl ? `
@@ -1124,12 +1162,7 @@ function renderExerciseCard(ex, idx) {
           </div>
         ` : ''}
         <div class="ex-sets">
-          <div class="set-row" style="margin-bottom:4px">
-            <div class="set-num" style="font-size:9px;color:var(--text3)">SET</div>
-            <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">WEIGHT</div>
-            <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">REPS</div>
-            <div></div>
-          </div>
+          ${headerLabels}
           ${rows.join('')}
         </div>
       </div>
