@@ -1458,6 +1458,12 @@ async function finishWorkout() {
 
   showScreen('summary');
   sendTelegramData({ action: 'workout_complete', workout_id: currentWorkout.id, duration: elapsed, sets: totalSets });
+
+  // Auto-create tomorrow's workout so Pip can generate it in the background
+  try {
+    await sb.from('pip_workouts')
+      .insert({ status: 'pending', user_id: 'jon' });
+  } catch(e) { console.error('Auto-create next workout error:', e); }
 }
 
 // ── HOME / SCREEN NAV ─────────────────────────────────────────────────────────
