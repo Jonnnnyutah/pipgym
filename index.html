@@ -1146,6 +1146,25 @@ function handleWorkoutUpdate(w) {
   }
 }
 
+// ── SECTION ICONS ─────────────────────────────────────────────────────────────
+function getSectionIcon(section) {
+  if (!section) return '▸';
+  const emojiMatch = section.match(/^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F?)/u);
+  if (emojiMatch) return emojiMatch[0];
+  const key = section.toLowerCase().trim();
+  const icons = {
+    'warmup': '🔥', 'warm-up': '🔥', 'warm up': '🔥',
+    'skills': '🤸', 'skill': '🤸',
+    'explosive': '⚡', 'power': '⚡', 'plyometrics': '⚡',
+    'strength': '🏋️', 'hypertrophy': '🏋️',
+    'core': '🧱', 'abs': '🧱',
+    'extras': '🔧', 'accessory': '🔧',
+    'conditioning': '⚡', 'cardio': '⚡', 'finisher': '⚡',
+    'cooldown': '🧊', 'mobility': '🧊',
+  };
+  return icons[key] || '▸';
+}
+
 // ── RENDER EXERCISES ──────────────────────────────────────────────────────────
 function renderExercises(workout) {
   const genState = document.getElementById('gen-state');
@@ -1161,26 +1180,6 @@ function renderExercises(workout) {
     `${workout.exercises.length} exercises`;
 
   const exercises = workout.exercises;
-  
-  // Group exercises by section
-  function getSectionIcon(section) {
-    if (!section) return '▸';
-    // If section already starts with emoji, extract it
-    const emojiMatch = section.match(/^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F?)/u);
-    if (emojiMatch) return emojiMatch[0];
-    const key = section.toLowerCase().trim();
-    const icons = {
-      'warmup': '🔥', 'warm-up': '🔥', 'warm up': '🔥',
-      'skills': '🤸', 'skill': '🤸',
-      'explosive': '⚡', 'power': '⚡', 'plyometrics': '⚡',
-      'strength': '🏋️', 'hypertrophy': '🏋️',
-      'core': '🧱', 'abs': '🧱',
-      'conditioning': '⚡', 'cardio': '⚡', 'finisher': '⚡',
-      'cooldown': '🧊', 'mobility': '🧊',
-      'accessory': '🔧',
-    };
-    return icons[key] || '▸';
-  }
   
   // Group exercises by section (preserve order)
   const sections = [];
