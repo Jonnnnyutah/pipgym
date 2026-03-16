@@ -1257,7 +1257,7 @@ function checkSectionCompletion() {
     // Find all exercise indices in this section
     const exIndices = [];
     currentWorkout.exercises.forEach((ex, idx) => {
-      if ((ex.section || '').trim() === sectionName) exIndices.push(idx);
+      if ((ex.section || ex.muscle || '').trim() === sectionName) exIndices.push(idx);
     });
     
     // Check if all sets in this section are logged
