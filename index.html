@@ -1247,10 +1247,13 @@ async function logSet(exIdx, setNum) {
     if (heightEl) heightEl.disabled = true;
     if (repsEl) repsEl.disabled = true;
   } else if (isTime) {
-    // time is stored as total seconds in reps via setTimeChange
-    reps = log.reps || null;
+    // Read directly from DOM inputs as primary source
     const minEl = document.getElementById(`time-min-${exIdx}-${setNum}`);
     const secEl = document.getElementById(`time-sec-${exIdx}-${setNum}`);
+    const mins = parseInt(minEl?.value) || 0;
+    const secs = parseInt(secEl?.value) || 0;
+    reps = (mins * 60) + secs; // total seconds stored in reps
+    if (reps === 0) reps = log.reps || null; // fallback to in-memory
     if (minEl) minEl.disabled = true;
     if (secEl) secEl.disabled = true;
   } else {
