@@ -1004,22 +1004,23 @@ function renderExercises(workout) {
   const exercises = workout.exercises;
   
   // Group exercises by section
-  const sectionIcons = {
-    'warmup': '🔥', 'warm-up': '🔥', 'warm up': '🔥',
-    'skills': '🎯', 'skill': '🎯', 'skill work': '🎯',
-    'strength': '💪', 'main': '💪', 'working sets': '💪',
-    'core': '🧱', 'abs': '🧱',
-    'conditioning': '⚡', 'cardio': '⚡', 'finisher': '⚡',
-    'cooldown': '🧊', 'cool-down': '🧊', 'cool down': '🧊', 'mobility': '🧊',
-    'accessory': '🔧', 'accessories': '🔧',
-    'superset': '🔄', 'circuit': '🔄',
-    'prehab': '🛡️', 'rehab': '🛡️',
-  };
-  
   function getSectionIcon(section) {
     if (!section) return '▸';
+    // If section already starts with emoji, extract it
+    const emojiMatch = section.match(/^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F?)/u);
+    if (emojiMatch) return emojiMatch[0];
     const key = section.toLowerCase().trim();
-    return sectionIcons[key] || '▸';
+    const icons = {
+      'warmup': '🔥', 'warm-up': '🔥', 'warm up': '🔥',
+      'skills': '🤸', 'skill': '🤸',
+      'explosive': '⚡', 'power': '⚡', 'plyometrics': '⚡',
+      'strength': '🏋️', 'hypertrophy': '🏋️',
+      'core': '🧱', 'abs': '🧱',
+      'conditioning': '⚡', 'cardio': '⚡', 'finisher': '⚡',
+      'cooldown': '🧊', 'mobility': '🧊',
+      'accessory': '🔧',
+    };
+    return icons[key] || '▸';
   }
   
   // Group exercises by section (preserve order)
@@ -1027,7 +1028,7 @@ function renderExercises(workout) {
   let currentSection = null;
   
   exercises.forEach((ex, idx) => {
-    const section = (ex.section || '').trim();
+    const section = (ex.section || ex.muscle || '').trim();
     if (section !== currentSection) {
       sections.push({ name: section, exercises: [{ ex, idx }] });
       currentSection = section;
