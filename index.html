@@ -1264,36 +1264,61 @@ function renderExerciseCard(ex, idx) {
         </div>
       `);
     } else if (isTime) {
+      const useMinSec = ex.timeFormat === 'min:sec';
       const totalSec = log.reps || 0;
-      const dispMin = Math.floor(totalSec / 60) || '';
-      const dispSec = totalSec ? (totalSec % 60) : '';
-      rows.push(`
-        <div class="set-row ${logged ? 'logged' : ''}" id="set-row-${idx}-${s}">
-          <div class="set-num">${s}</div>
-          <input class="set-input ${logged ? 'disabled' : ''}"
-            type="number" inputmode="numeric" placeholder="min"
-            id="time-min-${idx}-${s}"
-            value="${dispMin}"
-            ${logged ? 'disabled' : ''}
-            style="width:55px;"
-            onchange="setTimeChange(${idx},${s})">
-          <div style="font-size:11px;color:var(--text3)">:</div>
-          <input class="set-input ${logged ? 'disabled' : ''}"
-            type="number" inputmode="numeric" placeholder="sec"
-            id="time-sec-${idx}-${s}"
-            value="${dispSec}"
-            ${logged ? 'disabled' : ''}
-            style="width:55px;"
-            onchange="setTimeChange(${idx},${s})">
-          <div class="set-check ${logged ? 'done' : ''}"
-            id="check-${idx}-${s}"
-            onclick="logSet(${idx},${s})">
-            <svg viewBox="0 0 24 24" fill="none" stroke="${logged ? 'white' : 'currentColor'}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="20 6 9 17 4 12"/>
-            </svg>
+      if (useMinSec) {
+        const dispMin = Math.floor(totalSec / 60) || '';
+        const dispSec = totalSec ? (totalSec % 60) : '';
+        rows.push(`
+          <div class="set-row ${logged ? 'logged' : ''}" id="set-row-${idx}-${s}">
+            <div class="set-num">${s}</div>
+            <input class="set-input ${logged ? 'disabled' : ''}"
+              type="number" inputmode="numeric" placeholder="min"
+              id="time-min-${idx}-${s}"
+              value="${dispMin}"
+              ${logged ? 'disabled' : ''}
+              style="width:55px;"
+              onchange="setTimeChange(${idx},${s})">
+            <div style="font-size:11px;color:var(--text3)">:</div>
+            <input class="set-input ${logged ? 'disabled' : ''}"
+              type="number" inputmode="numeric" placeholder="sec"
+              id="time-sec-${idx}-${s}"
+              value="${dispSec}"
+              ${logged ? 'disabled' : ''}
+              style="width:55px;"
+              onchange="setTimeChange(${idx},${s})">
+            <div class="set-check ${logged ? 'done' : ''}"
+              id="check-${idx}-${s}"
+              onclick="logSet(${idx},${s})">
+              <svg viewBox="0 0 24 24" fill="none" stroke="${logged ? 'white' : 'currentColor'}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </div>
           </div>
-        </div>
-      `);
+        `);
+      } else {
+        // Seconds-only (default for holds)
+        const dispSec = totalSec || '';
+        rows.push(`
+          <div class="set-row ${logged ? 'logged' : ''}" id="set-row-${idx}-${s}">
+            <div class="set-num">${s}</div>
+            <input class="set-input ${logged ? 'disabled' : ''}"
+              type="number" inputmode="numeric" placeholder="sec"
+              id="time-sec-${idx}-${s}"
+              value="${dispSec}"
+              ${logged ? 'disabled' : ''}
+              onchange="setLogChange(${idx},${s},'reps',this.value)">
+            <div></div>
+            <div class="set-check ${logged ? 'done' : ''}"
+              id="check-${idx}-${s}"
+              onclick="logSet(${idx},${s})">
+              <svg viewBox="0 0 24 24" fill="none" stroke="${logged ? 'white' : 'currentColor'}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </div>
+          </div>
+        `);
+      }
     } else {
       rows.push(`
         <div class="set-row ${logged ? 'logged' : ''}" id="set-row-${idx}-${s}">
@@ -1322,23 +1347,33 @@ function renderExerciseCard(ex, idx) {
     }
   }
   const imgUrl = ex.imageUrl || ex.formImageUrl || null;
+  const useMinSec = ex.timeFormat === 'min:sec';
   const badgeText = isTime ? `${sets} × hold` : isHeight ? `${sets} × ${ex.reps || '?'}` : `${sets} × ${ex.reps || '?'}`;
-  const headerLabels = isHeight
-    ? `<div class="set-row" style="margin-bottom:4px">
+  let headerLabels;
+  if (isHeight) {
+    headerLabels = `<div class="set-row" style="margin-bottom:4px">
         <div class="set-num" style="font-size:9px;color:var(--text3)">SET</div>
         <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">HEIGHT</div>
         <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">REPS</div>
         <div></div>
-      </div>`
-    : isTime
-    ? `<div class="set-row" style="margin-bottom:4px">
+      </div>`;
+  } else if (isTime && useMinSec) {
+    headerLabels = `<div class="set-row" style="margin-bottom:4px">
         <div class="set-num" style="font-size:9px;color:var(--text3)">SET</div>
         <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">MIN</div>
         <div></div>
         <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">SEC</div>
         <div></div>
-      </div>`
-    : `<div class="set-row" style="margin-bottom:4px">
+      </div>`;
+  } else if (isTime) {
+    headerLabels = `<div class="set-row" style="margin-bottom:4px">
+        <div class="set-num" style="font-size:9px;color:var(--text3)">SET</div>
+        <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">SECONDS</div>
+        <div></div>
+        <div></div>
+      </div>`;
+  } else {
+    headerLabels = `<div class="set-row" style="margin-bottom:4px">
         <div class="set-num" style="font-size:9px;color:var(--text3)">SET</div>
         <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">WEIGHT</div>
         <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">REPS</div>
@@ -1408,12 +1443,19 @@ async function logSet(exIdx, setNum) {
     // Read directly from DOM inputs as primary source
     const minEl = document.getElementById(`time-min-${exIdx}-${setNum}`);
     const secEl = document.getElementById(`time-sec-${exIdx}-${setNum}`);
-    const mins = parseInt(minEl?.value) || 0;
-    const secs = parseInt(secEl?.value) || 0;
-    reps = (mins * 60) + secs; // total seconds stored in reps
+    if (minEl) {
+      // min:sec mode
+      const mins = parseInt(minEl.value) || 0;
+      const secs = parseInt(secEl?.value) || 0;
+      reps = (mins * 60) + secs;
+      minEl.disabled = true;
+      if (secEl) secEl.disabled = true;
+    } else if (secEl) {
+      // seconds-only mode
+      reps = parseInt(secEl.value) || 0;
+      secEl.disabled = true;
+    }
     if (reps === 0) reps = log.reps || null; // fallback to in-memory
-    if (minEl) minEl.disabled = true;
-    if (secEl) secEl.disabled = true;
   } else {
     const weightEl = document.getElementById(`weight-${exIdx}-${setNum}`);
     const repsEl = document.getElementById(`reps-${exIdx}-${setNum}`);
