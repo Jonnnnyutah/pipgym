@@ -76,8 +76,20 @@ body::before{
   border:1px solid rgba(255,107,53,0.2);
   border-radius:8px;padding:4px 10px;
   display:none;
+  cursor:pointer;
+  -webkit-user-select:none;user-select:none;
+  transition:all 0.15s;
 }
-.top-timer.visible{display:block}
+.top-timer.visible{display:flex;align-items:center;gap:6px}
+.top-timer:active{opacity:0.7}
+.top-timer.paused{
+  color:var(--yellow);
+  border-color:rgba(245,158,11,0.3);
+  background:rgba(245,158,11,0.1);
+  animation:timerBlink 1.2s ease-in-out infinite;
+}
+@keyframes timerBlink{0%,100%{opacity:1}50%{opacity:0.5}}
+.timer-pause-icon{font-size:12px;flex-shrink:0}
 
 /* CARDS */
 .card{
@@ -785,7 +797,7 @@ body::before{
   <div id="screen-workout" class="screen">
     <div class="top-bar">
       <div class="logo">pip<span>gym</span></div>
-      <div class="top-timer visible" id="workout-timer">0:00</div>
+      <div class="top-timer visible" id="workout-timer" onclick="toggleTimerPause()"><span class="timer-pause-icon">⏱</span><span id="workout-timer-text">0:00</span></div>
     </div>
 
     <div class="workout-header">
@@ -1593,15 +1605,103 @@ function skipRest() {
   document.getElementById('rest-overlay').classList.add('hidden');
 }
 
-// ── WORKOUT TIMER ─────────────────────────────────────────────────────────────
+// ── WORKOUT TIMER (persistent + pausable) ─────────────────────────────────────
+let timerPaused = false;
+let timerPausedElapsed = 0; // seconds elapsed when paused
+
 function startWorkoutTimer() {
-  workoutStartTime = Date.now();
+  // Check localStorage for an existing timer
+  const saved = localStorage.getItem('pipgym_timer');
+  if (saved) {
+    try {
+      const t = JSON.parse(saved);
+      if (t.workoutId === currentWorkout?.id) {
+        workoutStartTime = t.startTime;
+        timerPaused = !!t.paused;
+        timerPausedElapsed = t.pausedElapsed || 0;
+        if (timerPaused) {
+          updateTimerDisplay(timerPausedElapsed);
+          applyTimerPauseStyle(true);
+          return; // don't start interval, it's paused
+        }
+      } else {
+        // Different workout, start fresh
+        localStorage.removeItem('pipgym_timer');
+      }
+    } catch(e) { localStorage.removeItem('pipgym_timer'); }
+  }
+
+  if (!workoutStartTime) workoutStartTime = Date.now();
+  timerPaused = false;
+  timerPausedElapsed = 0;
+  saveTimerState();
+  runTimerInterval();
+}
+
+function runTimerInterval() {
   clearInterval(workoutTimerInterval);
   workoutTimerInterval = setInterval(() => {
+    if (timerPaused) return;
     const elapsed = Math.floor((Date.now() - workoutStartTime) / 1000);
-    const timerEl = document.getElementById('workout-timer');
-    if (timerEl) timerEl.textContent = formatDuration(elapsed);
+    updateTimerDisplay(elapsed);
   }, 1000);
+}
+
+function updateTimerDisplay(seconds) {
+  const textEl = document.getElementById('workout-timer-text');
+  if (textEl) textEl.textContent = formatDuration(seconds);
+  // Also update home timer if visible
+  const homeTimer = document.getElementById('home-timer');
+  if (homeTimer) homeTimer.textContent = formatDuration(seconds);
+}
+
+function toggleTimerPause() {
+  if (!currentWorkout) return;
+  const timerEl = document.getElementById('workout-timer');
+  
+  if (timerPaused) {
+    // Resume: adjust startTime so elapsed stays continuous
+    const now = Date.now();
+    workoutStartTime = now - (timerPausedElapsed * 1000);
+    timerPaused = false;
+    applyTimerPauseStyle(false);
+    runTimerInterval();
+  } else {
+    // Pause: capture current elapsed
+    timerPausedElapsed = Math.floor((Date.now() - workoutStartTime) / 1000);
+    timerPaused = true;
+    clearInterval(workoutTimerInterval);
+    applyTimerPauseStyle(true);
+  }
+  saveTimerState();
+}
+
+function applyTimerPauseStyle(paused) {
+  const timerEl = document.getElementById('workout-timer');
+  const icon = timerEl?.querySelector('.timer-pause-icon');
+  if (paused) {
+    timerEl?.classList.add('paused');
+    if (icon) icon.textContent = '▶';
+  } else {
+    timerEl?.classList.remove('paused');
+    if (icon) icon.textContent = '⏱';
+  }
+}
+
+function saveTimerState() {
+  if (!currentWorkout) return;
+  localStorage.setItem('pipgym_timer', JSON.stringify({
+    workoutId: currentWorkout.id,
+    startTime: workoutStartTime,
+    paused: timerPaused,
+    pausedElapsed: timerPausedElapsed
+  }));
+}
+
+function getElapsedSeconds() {
+  if (timerPaused) return timerPausedElapsed;
+  if (!workoutStartTime) return 0;
+  return Math.floor((Date.now() - workoutStartTime) / 1000);
 }
 
 // ── FINISH WORKOUT ────────────────────────────────────────────────────────────
@@ -1611,7 +1711,8 @@ async function finishWorkout() {
   clearInterval(restTimerInterval);
   document.getElementById('rest-overlay').classList.add('hidden');
 
-  const elapsed = workoutStartTime ? Math.floor((Date.now() - workoutStartTime) / 1000) : 0;
+  const elapsed = getElapsedSeconds();
+  localStorage.removeItem('pipgym_timer');
 
   try {
     await sb.from('pip_workouts').update({
@@ -1693,7 +1794,10 @@ function goHome() {
   currentWorkout = null;
   setLogs = {};
   workoutStartTime = null;
+  timerPaused = false;
+  timerPausedElapsed = 0;
   clearInterval(workoutTimerInterval);
+  localStorage.removeItem('pipgym_timer');
   
   // Reset home state
   document.getElementById('start-btn').disabled = false;
