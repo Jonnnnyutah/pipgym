@@ -796,7 +796,7 @@ body::before{
   <!-- WORKOUT SCREEN -->
   <div id="screen-workout" class="screen">
     <div class="top-bar">
-      <div class="logo">pip<span>gym</span></div>
+      <div style="cursor:pointer;color:var(--accent);font-size:14px;font-family:'Space Mono',monospace;min-width:50px" onclick="confirmLeaveWorkout()">← Home</div>
       <div class="top-timer visible" id="workout-timer" onclick="toggleTimerPause()"><span class="timer-pause-icon">⏱</span><span id="workout-timer-text">0:00</span></div>
     </div>
 
@@ -1800,6 +1800,18 @@ function showWorkoutScreen() {
   } else {
     renderExercises(currentWorkout);
   }
+}
+
+function confirmLeaveWorkout() {
+  // If workout has logged sets, confirm before leaving
+  const hasLogs = Object.values(setLogs).some(ex => Object.values(ex).some(s => s.logged));
+  if (hasLogs) {
+    if (!confirm('Leave workout? Your logged sets are saved — you can resume from home.')) return;
+  }
+  // Don't clear timer or workout state — user can resume
+  showScreen('home');
+  loadRecentWorkouts();
+  checkActiveWorkout();
 }
 
 function goHome() {
