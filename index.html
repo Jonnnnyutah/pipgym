@@ -701,6 +701,64 @@ body::before{
 .wh-diff.up{color:var(--red);background:rgba(239,68,68,0.12)}
 .wh-diff.same{color:var(--text3);background:var(--bg-card2)}
 
+/* LOGIN SCREEN */
+.login-screen{
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  min-height:100vh;padding:32px 24px;
+  position:relative;z-index:1;
+}
+.login-logo{
+  font-family:'Space Mono',monospace;
+  font-size:36px;font-weight:700;
+  color:var(--accent);margin-bottom:8px;
+}
+.login-logo span{color:var(--text2);font-weight:400}
+.login-sub{
+  font-size:14px;color:var(--text2);
+  margin-bottom:32px;
+}
+.login-form{
+  width:100%;max-width:320px;
+  display:flex;flex-direction:column;gap:12px;
+}
+.login-input{
+  background:var(--bg-input);
+  border:1px solid var(--border2);
+  border-radius:12px;
+  padding:14px 16px;
+  color:var(--text);font-size:15px;
+  font-family:'DM Sans',sans-serif;
+  width:100%;
+  transition:border-color 0.15s;
+  -webkit-appearance:none;
+}
+.login-input:focus{outline:none;border-color:var(--accent)}
+.login-input::placeholder{color:var(--text3)}
+.login-btn{
+  padding:16px;
+  background:var(--accent);
+  border:none;border-radius:12px;
+  color:white;font-size:16px;font-weight:700;
+  font-family:'DM Sans',sans-serif;
+  cursor:pointer;
+  box-shadow:0 4px 20px var(--accent-glow);
+  transition:all 0.15s;
+  margin-top:4px;
+}
+.login-btn:active{transform:scale(0.97)}
+.login-btn:disabled{opacity:0.5;pointer-events:none}
+.login-error{
+  font-size:13px;color:var(--red);
+  text-align:center;min-height:20px;
+}
+.login-toggle{
+  font-size:13px;color:var(--text2);
+  text-align:center;margin-top:12px;
+  cursor:pointer;
+}
+.login-toggle span{color:var(--accent);font-weight:600}
+
 /* UTILS */
 .mt8{margin-top:8px}
 .hidden{display:none!important}
@@ -709,11 +767,29 @@ body::before{
 <body>
 <div id="app">
 
+  <!-- LOGIN SCREEN -->
+  <div id="screen-login" class="screen active">
+    <div class="login-screen">
+      <div class="login-logo">for<span>za</span></div>
+      <div class="login-sub">Your AI workout coach</div>
+      <div class="login-form" id="login-form">
+        <input class="login-input" id="login-name" type="text" placeholder="Name" autocomplete="name" style="display:none">
+        <input class="login-input" id="login-email" type="email" placeholder="Email" autocomplete="email">
+        <input class="login-input" id="login-password" type="password" placeholder="Password" autocomplete="current-password">
+        <div class="login-error" id="login-error"></div>
+        <button class="login-btn" id="login-btn" onclick="handleLogin()">Sign In</button>
+        <div class="login-toggle" id="login-toggle" onclick="toggleLoginMode()">
+          Don't have an account? <span>Sign Up</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- HOME SCREEN -->
-  <div id="screen-home" class="screen active">
+  <div id="screen-home" class="screen">
     <div class="top-bar">
       <div class="logo">for<span>za</span></div>
-      <div class="top-timer" id="home-timer"></div>
+      <div style="cursor:pointer;color:var(--text3);font-size:12px;font-family:'Space Mono',monospace" onclick="logout()">Logout</div>
     </div>
 
     <div class="greeting-block">
@@ -895,6 +971,7 @@ function sendTelegramData(data) {
 }
 
 // ── STATE ────────────────────────────────────────────────────────────────────
+let currentUser = null; // { id, name, email }
 let currentWorkout = null;
 let workoutSub = null;
 let setsSub = null;
@@ -903,17 +980,181 @@ let workoutTimerInterval = null;
 let restTimerInterval = null;
 let restRemaining = 0;
 const REST_DEFAULT = 90;
-// setLogs[exerciseIdx][setNum] = { weight, reps, logged }
 let setLogs = {};
+let loginMode = 'signin'; // 'signin' or 'signup'
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
+  // Check for existing session
+  const saved = localStorage.getItem('forza_user');
+  if (saved) {
+    try {
+      currentUser = JSON.parse(saved);
+      enterApp();
+      return;
+    } catch(e) { localStorage.removeItem('forza_user'); }
+  }
+  // Show login
+  showScreen('login');
+}
+
+async function enterApp() {
+  // Update greeting
+  const nameEl = document.querySelector('.greeting-name');
+  if (nameEl && currentUser?.name) {
+    nameEl.textContent = currentUser.name.split(' ')[0];
+  }
+  showScreen('home');
   renderDate();
   await loadStreak();
   await loadRecentWorkouts();
   await checkActiveWorkout();
+}
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+function toggleLoginMode() {
+  const nameInput = document.getElementById('login-name');
+  const btn = document.getElementById('login-btn');
+  const toggle = document.getElementById('login-toggle');
+  const err = document.getElementById('login-error');
+  err.textContent = '';
+
+  if (loginMode === 'signin') {
+    loginMode = 'signup';
+    nameInput.style.display = 'block';
+    btn.textContent = 'Create Account';
+    toggle.innerHTML = 'Already have an account? <span>Sign In</span>';
+  } else {
+    loginMode = 'signin';
+    nameInput.style.display = 'none';
+    btn.textContent = 'Sign In';
+    toggle.innerHTML = "Don't have an account? <span>Sign Up</span>";
+  }
+}
+
+async function handleLogin() {
+  const nameInput = document.getElementById('login-name');
+  const emailInput = document.getElementById('login-email');
+  const passInput = document.getElementById('login-password');
+  const err = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+
+  const email = emailInput.value.trim().toLowerCase();
+  const password = passInput.value;
+  const name = nameInput.value.trim();
+
+  err.textContent = '';
+
+  if (!email || !password) {
+    err.textContent = 'Email and password required';
+    return;
+  }
+
+  if (loginMode === 'signup' && !name) {
+    err.textContent = 'Name required';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = loginMode === 'signup' ? 'Creating...' : 'Signing in...';
+
+  try {
+    if (loginMode === 'signup') {
+      // Check if email exists
+      const { data: existing } = await sb.from('User')
+        .select('id')
+        .eq('email', email)
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        err.textContent = 'Email already registered. Sign in instead.';
+        btn.disabled = false;
+        btn.textContent = 'Create Account';
+        return;
+      }
+
+      // Hash password (simple for now — not production-grade)
+      const passHash = await simpleHash(password);
+
+      // Create user
+      const { data: newUser, error: createErr } = await sb.from('User')
+        .insert({
+          email,
+          name,
+          passwordHash: passHash,
+          onboardingCompleted: false,
+          onboardingInterviewCompleted: false
+        })
+        .select()
+        .single();
+
+      if (createErr) throw createErr;
+
+      // Create profile
+      await sb.from('UserProfile').insert({
+        userId: newUser.id,
+        preferredDays: ['Mon','Tue','Wed','Thu','Fri'],
+        injuries: [],
+        preferences: []
+      });
+
+      currentUser = { id: newUser.id, name, email };
+      localStorage.setItem('forza_user', JSON.stringify(currentUser));
+      enterApp();
+
+    } else {
+      // Sign in
+      const { data: users } = await sb.from('User')
+        .select('id, email, passwordHash, name')
+        .eq('email', email)
+        .limit(1);
+
+      if (!users || users.length === 0) {
+        err.textContent = 'No account found with that email';
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+        return;
+      }
+
+      const user = users[0];
+      const passHash = await simpleHash(password);
+
+      if (user.passwordHash !== passHash) {
+        err.textContent = 'Wrong password';
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+        return;
+      }
+
+      const displayName = user.name || email.split('@')[0];
+      currentUser = { id: user.id, name: displayName, email };
+      localStorage.setItem('forza_user', JSON.stringify(currentUser));
+      enterApp();
+    }
+  } catch(e) {
+    console.error('Auth error:', e);
+    err.textContent = 'Something went wrong. Try again.';
+    btn.disabled = false;
+    btn.textContent = loginMode === 'signup' ? 'Create Account' : 'Sign In';
+  }
+}
+
+async function simpleHash(str) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(str);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function logout() {
+  currentUser = null;
+  localStorage.removeItem('forza_user');
+  localStorage.removeItem('forza_timer');
+  currentWorkout = null;
+  setLogs = {};
+  showScreen('login');
 }
 
 function renderDate() {
@@ -940,6 +1181,7 @@ async function loadStreak() {
   try {
     const { data } = await sb.from('workouts')
       .select('created_at')
+      .eq('user_id', currentUser?.id)
       .eq('status', 'completed')
       .gte('created_at', weekStart.toISOString())
       .lt('created_at', weekEnd.toISOString());
@@ -973,6 +1215,7 @@ async function loadRecentWorkouts() {
   try {
     const { data } = await sb.from('workouts')
       .select('*')
+      .eq('user_id', currentUser?.id)
       .in('status', ['completed', 'abandoned'])
       .order('created_at', { ascending: false })
       .limit(10);
@@ -1011,6 +1254,7 @@ async function checkActiveWorkout() {
   try {
     const { data } = await sb.from('workouts')
       .select('*')
+      .eq('user_id', currentUser?.id)
       .in('status', ['active', 'ready', 'pending', 'generating'])
       .order('created_at', { ascending: false })
       .limit(1);
@@ -1064,6 +1308,7 @@ async function startWorkout() {
     // Check for existing non-completed workout first
     const { data: existing } = await sb.from('workouts')
       .select('*')
+      .eq('user_id', currentUser?.id)
       .in('status', ['active', 'ready', 'pending', 'generating'])
       .order('created_at', { ascending: false })
       .limit(1);
@@ -1098,7 +1343,7 @@ async function startWorkout() {
     // No existing workout — create new one
     btn.textContent = 'Creating...';
     const { data, error } = await sb.from('workouts')
-      .insert({ status: 'pending', user_id: 'jon' })
+      .insert({ status: 'pending', user_id: currentUser?.id || 'anon' })
       .select()
       .single();
 
@@ -1768,7 +2013,7 @@ async function finishWorkout() {
   // Auto-create tomorrow's workout so Pip can generate it in the background
   try {
     await sb.from('workouts')
-      .insert({ status: 'pending', user_id: 'jon' });
+      .insert({ status: 'pending', user_id: currentUser?.id || 'anon' });
   } catch(e) { console.error('Auto-create next workout error:', e); }
 }
 
@@ -2004,7 +2249,7 @@ async function saveWeight() {
   input.style.borderColor = '';
 
   await sb.from('bodyweight').insert({
-    user_id: 'jon',
+    user_id: currentUser?.id || 'anon',
     weight,
     unit: 'lbs',
     date: new Date().toISOString().split('T')[0],
@@ -2020,7 +2265,7 @@ async function loadWeightHistory() {
   try {
     const { data } = await sb.from('bodyweight')
       .select('weight, unit, date, created_at')
-      .eq('user_id', 'jon')
+      .eq('user_id', currentUser?.id || 'anon')
       .order('date', { ascending: false })
       .limit(7);
     if (!data || data.length === 0) {
