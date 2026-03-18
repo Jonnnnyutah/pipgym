@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>PipGym</title>
+<title>Forza</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -712,7 +712,7 @@ body::before{
   <!-- HOME SCREEN -->
   <div id="screen-home" class="screen active">
     <div class="top-bar">
-      <div class="logo">pip<span>gym</span></div>
+      <div class="logo">for<span>za</span></div>
       <div class="top-timer" id="home-timer"></div>
     </div>
 
@@ -791,6 +791,8 @@ body::before{
     </div>
 
     <div class="workout-header">
+
+    <div class="workout-header">
       <div class="workout-title" id="workout-title">Today's Workout</div>
       <div class="workout-subtitle" id="workout-subtitle"></div>
     </div>
@@ -819,7 +821,7 @@ body::before{
   <!-- SUMMARY SCREEN -->
   <div id="screen-summary" class="screen">
     <div class="top-bar">
-      <div class="logo">pip<span>gym</span></div>
+      <div class="logo">for<span>za</span></div>
     </div>
     <div class="summary-header">
       <div class="summary-icon">🏆</div>
@@ -843,7 +845,7 @@ body::before{
   <div id="screen-review" class="screen">
     <div class="top-bar">
       <div style="cursor:pointer;color:var(--accent);font-size:14px;font-family:'Space Mono',monospace" onclick="goHome()">← Back</div>
-      <div class="logo">pip<span>gym</span></div>
+      <div class="logo">for<span>za</span></div>
       <div></div>
     </div>
     <div class="workout-header">
@@ -1613,7 +1615,7 @@ let timerPausedElapsed = 0; // seconds elapsed when paused
 
 function startWorkoutTimer() {
   // Check localStorage for an existing timer
-  const saved = localStorage.getItem('pipgym_timer');
+  const saved = localStorage.getItem('forza_timer');
   if (saved) {
     try {
       const t = JSON.parse(saved);
@@ -1628,9 +1630,9 @@ function startWorkoutTimer() {
         }
       } else {
         // Different workout, start fresh
-        localStorage.removeItem('pipgym_timer');
+        localStorage.removeItem('forza_timer');
       }
-    } catch(e) { localStorage.removeItem('pipgym_timer'); }
+    } catch(e) { localStorage.removeItem('forza_timer'); }
   }
 
   if (!workoutStartTime) workoutStartTime = Date.now();
@@ -1692,7 +1694,7 @@ function applyTimerPauseStyle(paused) {
 
 function saveTimerState() {
   if (!currentWorkout) return;
-  localStorage.setItem('pipgym_timer', JSON.stringify({
+  localStorage.setItem('forza_timer', JSON.stringify({
     workoutId: currentWorkout.id,
     startTime: workoutStartTime,
     paused: timerPaused,
@@ -1714,7 +1716,7 @@ async function finishWorkout() {
   document.getElementById('rest-overlay').classList.add('hidden');
 
   const elapsed = getElapsedSeconds();
-  localStorage.removeItem('pipgym_timer');
+  localStorage.removeItem('forza_timer');
 
   try {
     await sb.from('pip_workouts').update({
@@ -1811,7 +1813,7 @@ function goHome() {
   timerPaused = false;
   timerPausedElapsed = 0;
   clearInterval(workoutTimerInterval);
-  localStorage.removeItem('pipgym_timer');
+  localStorage.removeItem('forza_timer');
   
   // Reset home state
   document.getElementById('start-btn').disabled = false;
