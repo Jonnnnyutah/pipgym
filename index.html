@@ -1279,26 +1279,18 @@ function renderExerciseCard(ex, idx) {
       const useMinSec = ex.timeFormat === 'min:sec';
       const totalSec = log.reps || 0;
       if (useMinSec) {
-        const dispMin = Math.floor(totalSec / 60) || '';
-        const dispSec = totalSec ? (totalSec % 60) : '';
+        const dispVal = totalSec ? formatMinSec(totalSec) : '';
         rows.push(`
           <div class="set-row ${logged ? 'logged' : ''}" id="set-row-${idx}-${s}">
             <div class="set-num">${s}</div>
             <input class="set-input ${logged ? 'disabled' : ''}"
-              type="number" inputmode="numeric" placeholder="min"
-              id="time-min-${idx}-${s}"
-              value="${dispMin}"
+              type="text" inputmode="numeric" placeholder="0:00"
+              id="time-minsec-${idx}-${s}"
+              value="${dispVal}"
               ${logged ? 'disabled' : ''}
-              style="width:55px;"
-              onchange="setTimeChange(${idx},${s})">
-            <div style="font-size:11px;color:var(--text3)">:</div>
-            <input class="set-input ${logged ? 'disabled' : ''}"
-              type="number" inputmode="numeric" placeholder="sec"
-              id="time-sec-${idx}-${s}"
-              value="${dispSec}"
-              ${logged ? 'disabled' : ''}
-              style="width:55px;"
-              onchange="setTimeChange(${idx},${s})">
+              oninput="autoFormatMinSec(this)"
+              onchange="setMinSecChange(${idx},${s})">
+            <div></div>
             <div class="set-check ${logged ? 'done' : ''}"
               id="check-${idx}-${s}"
               onclick="logSet(${idx},${s})">
@@ -1372,9 +1364,8 @@ function renderExerciseCard(ex, idx) {
   } else if (isTime && useMinSec) {
     headerLabels = `<div class="set-row" style="margin-bottom:4px">
         <div class="set-num" style="font-size:9px;color:var(--text3)">SET</div>
-        <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">MIN</div>
+        <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">TIME</div>
         <div></div>
-        <div style="font-size:10px;color:var(--text3);text-align:center;font-family:'Space Mono'">SEC</div>
         <div></div>
       </div>`;
   } else if (isTime) {
@@ -1425,13 +1416,37 @@ function setLogChange(exIdx, setNum, field, value) {
   setLogs[exIdx][setNum][field] = value;
 }
 
-function setTimeChange(exIdx, setNum) {
-  const minEl = document.getElementById(`time-min-${exIdx}-${setNum}`);
-  const secEl = document.getElementById(`time-sec-${exIdx}-${setNum}`);
-  const min = parseInt(minEl?.value) || 0;
-  const sec = parseInt(secEl?.value) || 0;
-  const totalSeconds = (min * 60) + sec;
+function setMinSecChange(exIdx, setNum) {
+  const el = document.getElementById(`time-minsec-${exIdx}-${setNum}`);
+  if (!el) return;
+  const totalSeconds = parseMinSec(el.value);
   setLogChange(exIdx, setNum, 'reps', totalSeconds);
+}
+
+function parseMinSec(val) {
+  if (!val) return 0;
+  val = val.trim();
+  if (val.includes(':')) {
+    const parts = val.split(':');
+    const min = parseInt(parts[0]) || 0;
+    const sec = parseInt(parts[1]) || 0;
+    return (min * 60) + sec;
+  }
+  // Plain number — treat as seconds if small, minutes if typed without colon
+  const num = parseFloat(val);
+  if (num > 0 && num === Math.floor(num)) return num; // whole number = seconds
+  return Math.round(num * 60); // decimal like 1.5 = 1m30s
+}
+
+function formatMinSec(totalSec) {
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function autoFormatMinSec(input) {
+  // Allow digits and colon only
+  input.value = input.value.replace(/[^0-9:]/g, '');
 }
 
 async function logSet(exIdx, setNum) {
@@ -1454,15 +1469,12 @@ async function logSet(exIdx, setNum) {
     if (repsEl) repsEl.disabled = true;
   } else if (isTime) {
     // Read directly from DOM inputs as primary source
-    const minEl = document.getElementById(`time-min-${exIdx}-${setNum}`);
+    const minsecEl = document.getElementById(`time-minsec-${exIdx}-${setNum}`);
     const secEl = document.getElementById(`time-sec-${exIdx}-${setNum}`);
-    if (minEl) {
-      // min:sec mode
-      const mins = parseInt(minEl.value) || 0;
-      const secs = parseInt(secEl?.value) || 0;
-      reps = (mins * 60) + secs;
-      minEl.disabled = true;
-      if (secEl) secEl.disabled = true;
+    if (minsecEl) {
+      // min:sec single-input mode
+      reps = parseMinSec(minsecEl.value);
+      minsecEl.disabled = true;
     } else if (secEl) {
       // seconds-only mode
       reps = parseInt(secEl.value) || 0;
