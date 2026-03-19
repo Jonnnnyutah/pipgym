@@ -986,18 +986,45 @@ let loginMode = 'signin'; // 'signin' or 'signup'
 // ── INIT ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', init);
 
+function savePersist(key, val) {
+  try { localStorage.setItem(key, val); } catch(e) {}
+  // Cookie fallback (90 day expiry) — more reliable in Telegram Mini Apps
+  try { document.cookie = `${key}=${encodeURIComponent(val)};path=/;max-age=${60*60*24*90};SameSite=Lax`; } catch(e) {}
+}
+function loadPersist(key) {
+  try {
+    const ls = localStorage.getItem(key);
+    if (ls) return ls;
+  } catch(e) {}
+  // Cookie fallback
+  try {
+    const match = document.cookie.match(new RegExp(`(?:^|; )${key}=([^;]*)`));
+    if (match) return decodeURIComponent(match[1]);
+  } catch(e) {}
+  return null;
+}
+function clearPersist(key) {
+  try { localStorage.removeItem(key); } catch(e) {}
+  try { document.cookie = `${key}=;path=/;max-age=0`; } catch(e) {}
+}
+
 async function init() {
-  // Check for existing session
-  const saved = localStorage.getItem('forza_user');
+  // Check for existing session (localStorage + cookie fallback)
+  const saved = loadPersist('forza_user');
   if (saved) {
     try {
       currentUser = JSON.parse(saved);
       enterApp();
       return;
-    } catch(e) { localStorage.removeItem('forza_user'); }
+    } catch(e) { clearPersist('forza_user'); }
   }
-  // Show login
+  // Show login — prefill email if we have it
   showScreen('login');
+  const lastEmail = loadPersist('forza_email');
+  if (lastEmail) {
+    const emailInput = document.getElementById('login-email');
+    if (emailInput) emailInput.value = lastEmail;
+  }
 }
 
 async function enterApp() {
@@ -1101,7 +1128,8 @@ async function handleLogin() {
       });
 
       currentUser = { id: newUser.id, name, email };
-      localStorage.setItem('forza_user', JSON.stringify(currentUser));
+      savePersist('forza_user', JSON.stringify(currentUser));
+      savePersist('forza_email', email);
       enterApp();
 
     } else {
@@ -1130,7 +1158,8 @@ async function handleLogin() {
 
       const displayName = user.name || email.split('@')[0];
       currentUser = { id: user.id, name: displayName, email };
-      localStorage.setItem('forza_user', JSON.stringify(currentUser));
+      savePersist('forza_user', JSON.stringify(currentUser));
+      savePersist('forza_email', email);
       enterApp();
     }
   } catch(e) {
@@ -1150,8 +1179,8 @@ async function simpleHash(str) {
 
 function logout() {
   currentUser = null;
-  localStorage.removeItem('forza_user');
-  localStorage.removeItem('forza_timer');
+  clearPersist('forza_user');
+  clearPersist('forza_timer');
   currentWorkout = null;
   setLogs = {};
   showScreen('login');
@@ -1860,7 +1889,7 @@ let timerPausedElapsed = 0; // seconds elapsed when paused
 
 function startWorkoutTimer() {
   // Check localStorage for an existing timer
-  const saved = localStorage.getItem('forza_timer');
+  const saved = loadPersist('forza_timer');
   if (saved) {
     try {
       const t = JSON.parse(saved);
@@ -1875,9 +1904,9 @@ function startWorkoutTimer() {
         }
       } else {
         // Different workout, start fresh
-        localStorage.removeItem('forza_timer');
+        clearPersist('forza_timer');
       }
-    } catch(e) { localStorage.removeItem('forza_timer'); }
+    } catch(e) { clearPersist('forza_timer'); }
   }
 
   if (!workoutStartTime) workoutStartTime = Date.now();
@@ -1939,7 +1968,7 @@ function applyTimerPauseStyle(paused) {
 
 function saveTimerState() {
   if (!currentWorkout) return;
-  localStorage.setItem('forza_timer', JSON.stringify({
+  savePersist('forza_timer', JSON.stringify({
     workoutId: currentWorkout.id,
     startTime: workoutStartTime,
     paused: timerPaused,
@@ -1961,7 +1990,7 @@ async function finishWorkout() {
   document.getElementById('rest-overlay').classList.add('hidden');
 
   const elapsed = getElapsedSeconds();
-  localStorage.removeItem('forza_timer');
+  clearPersist('forza_timer');
 
   try {
     await sb.from('workouts').update({
@@ -2058,7 +2087,7 @@ function goHome() {
   timerPaused = false;
   timerPausedElapsed = 0;
   clearInterval(workoutTimerInterval);
-  localStorage.removeItem('forza_timer');
+  clearPersist('forza_timer');
   
   // Reset home state
   document.getElementById('start-btn').disabled = false;
